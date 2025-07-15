@@ -1,57 +1,48 @@
-import os
+# main.py
+
 import sqlite3
 import streamlit as st
+from llm_handler import get_sql_query 
 
-from langchain_groq import ChatGroq
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-from dotenv import load_dotenv
-load_dotenv()
-
-def get_sql_query(user_query):
-    groq_sys_prompt = ChatPromptTemplate.from_template("""
-                    You are an expert in converting English questions to SQL query!
-                    The SQL database has the name STUDENT and has the following columns - NAME, COURSE, 
-                    SECTION and MARKS. For example, 
-                    Example 1 - How many entries of records are present?, 
-                        the SQL command will be something like this SELECT COUNT(*) FROM STUDENT;
-                    Example 2 - Tell me all the students studying in Data Science COURSE?, 
-                        the SQL command will be something like this SELECT * FROM STUDENT 
-                        where COURSE="Data Science"; 
-                    also the sql code should not have ``` in beginning or end and sql word in output.
-                    Now convert the following question in English to a valid SQL Query: {user_query}. 
-                    No preamble, only valid SQL please
-                                                       """)
-    model="llama3-8b-8192"
-    llm = ChatGroq(
-        groq_api_key=os.environ.get("GROQ_API_KEY"),
-        model_name=model
-    )
-
-    chain = groq_sys_prompt | llm | StrOutputParser()
-    response = chain.invoke({"user_query": user_query})
-    return response
-
-
-def return_sql_response(sql_query):
+def return_sql_response(sql_query: str):
+    """
+    Executes an SQL query and fetches all results from the database.
+    """
     database = "student.db"
-    with sqlite3.connect(database) as conn:
-        return conn.execute(sql_query).fetchall()
-
+    try:
+        with sqlite3.connect(database) as conn:
+            return conn.execute(sql_query).fetchall()
+    except sqlite3.OperationalError as e:
+        st.error(f"Database Error: {e}")
+        return None
 
 def main():
-    st.set_page_config(page_title="ASK IT DB")
-    st.header("Talk to your Database!")
+    """
+    Main function to run the Streamlit application.
+    """
+    st.set_page_config(page_title="Ask IT DB")
+    st.header("Talk to your Database! 💬")
 
-    user_query=st.text_input("Input:")
-    submit=st.button("Enter")
+    user_query = st.text_input("Ask a question about the student database:")
+    submit = st.button("Enter")
 
-    if submit:
+    if submit and user_query:
+        # 1. Get the SQL query from the LLM
         sql_query = get_sql_query(user_query)
+        
+        st.subheader(f"🔍 Generated SQL Query:")
+        st.code(sql_query, language="sql")
+        
+        # 2. Execute the query and get data
         retrieved_data = return_sql_response(sql_query)
-        st.subheader(f"Retrieving results from the database for the query: [{sql_query}]")
-        for row in retrieved_data:
-            st.header(row)
+
+        # 3. Display the results
+        if retrieved_data:
+            st.subheader("📝 Query Results:")
+            for row in retrieved_data:
+                st.write(row)
+        else:
+            st.warning("The query returned no results.")
 
 if __name__ == '__main__':
     main()
