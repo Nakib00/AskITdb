@@ -5,7 +5,8 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-
+from dotenv import load_dotenv
+load_dotenv()
 
 def get_sql_query(user_query):
     groq_sys_prompt = ChatPromptTemplate.from_template("""
@@ -23,8 +24,8 @@ def get_sql_query(user_query):
                                                        """)
     model="llama3-8b-8192"
     llm = ChatGroq(
-    groq_api_key = os.environ.get("GROQ_API_KEY"),
-    model_name=model
+        groq_api_key=os.environ.get("GROQ_API_KEY"),
+        model_name=model
     )
 
     chain = groq_sys_prompt | llm | StrOutputParser()
